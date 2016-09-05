@@ -1,0 +1,550 @@
+INTRODUCTION
+============
+
+    The web API takes the form https://urbanmiles.co/api/METHOD
+
+    All methods must be called using HTTPS. Parameters can be passed as GET or POST or a mix (it doesn't matter which you use).
+    Parameters passed by other HTTP methods will be ignored.
+
+    The response will be JSON. There will always be a top-level property 'success' indicating success or failure.
+    If failure, there will also be a top-level property 'error' and 'error_msg'.
+
+    There also always be the "api_time_taken" property as well which indicates in seconds how long it took to
+    perform the API method from after site initialization to json output.
+
+    'error' will contain an error code and 'error_msg' will contain a human readable error message. 'error_msg' is
+    not constant and not user-friendly, 'error_msg' is intended for developer use.
+
+    Other properties are defined in the documentation for the relevant method.
+
+        Success example:
+        
+        {
+            "success": true,
+            "stuff": "foo"
+        }
+        
+        Failure example:
+        
+        {
+            "success": false,
+            "error": "error.code",
+            "error_msg": "Something happened"
+        }
+        
+    
+    
+GENERIC ERRORS
+==============
+    These are general error messages that are not unique to any specific method.
+    
+    apicall.bad-user
+        If a method has a param expecting a user, but the given user_id is invalid
+        in that there is no user for that ID
+
+    generic-error
+        If an error occurred but there is no specific error code for that error
+
+    apicall.bad-request.invalid-auth-token
+        The given authentication token is invalid.
+        Either a bogus token was recieved or the auth token was invalidated
+        due to the user logging out
+        
+    apicall.bad-request.identification-required
+        Verification expected but signature not present
+
+    apicall.bad-request.invalid-signature
+        Verification expected however signature received is invalid
+
+    apicall.bad-request.param-count
+        If the amount of params received is not equal to the amount of params expected
+        
+    apicall.signin-required
+        The method expected the user to be signed in but is not.
+
+    apicall.no-param.<param>
+        A necessary param is not present.
+        Note: apicall.bad-request.param-count might override this error
+        
+    apicall.param-empty.<param>
+        A param expecting a value is present but empty
+        
+    apicall.bad-request.array
+        A param does not accept arrays but an array was received
+        
+    apicall.param-bad-type
+        A received param was not the type it is expected to be (usually only for primitive types)
+    
+    system-error
+        A PHP error occurred on the server-side
+        
+    stripe.*
+        Any error code starting with "stripe" has to do with Stripe (the payment processor)
+        Most likely the error is due to an invalid source token or card id
+        
+    
+    NOTE: Any API method can cause any of these generic error codes
+    Except for the "stripe.*", the stripe errors can only be caused
+    by the methods: "cards.*" and "request.start"
+        
+        
+APP AUTH
+========
+
+    app.auth
+        Params:
+            login        - user's ID or email
+            password     - user password
+            app_id       - application ID
+            device_id    - device unique ID
+            device_type  - device type (ex "Android")
+        Desc:
+            Login for an application
+        Errors:
+            app.auth-failure
+                Failed to authenticate
+                Either incorrect password or nonexistent user
+        Output:
+            Example:
+            
+            {
+                "success": true,
+                "api_time_taken": 2.412266,
+                "user_id": "89F5C71C033B4EB3A253C57A7B87270A",
+                "firstname": "Bob",
+                "lastname": "Smith",
+                "auth_token": "ffbf98179ca161c89d5eaba03844eb43"
+            }
+            
+            Note:
+                auth_token must be stored for authenticated request
+            
+    app.deauth
+        Params:
+            auth_token
+        Desc:
+            Logout for an application.
+            The given auth_token will be invalidated (ie. destroyed)
+            If you try to use the auth_token again after it is destroyed you'll
+            get the "apicall.bad-request.invalid-auth-token" error
+        Output:
+            No other properties
+
+CARDS
+=====
+
+    cards.add
+        Params:
+            stripe_token
+        Desc:
+            Adds a card to the current user
+        Output:
+            No other properties
+            
+
+    cards.buymiles
+        Params:
+            card_id - the id of the card to charge from
+            amount  - how many miles to buy
+        Desc:
+            Buy miles
+        Output:
+            
+            Example:
+            {
+                "success": true,
+                "api_time_taken": 0.455259,
+                "d_mi": 1,
+                "ch_id": "ch_16zGScCTG83q6EroaPhOizxa",
+                "cost": 200
+            }
+            
+            NOTE:
+                cost is always in cents
+                ch_id is the Stripe charge ID
+                d_mi is the amount of miles
+
+    cards.delete
+        Params:
+            card_id - id of card to remove
+        Desc:
+            Remove a card from current user
+        Output:
+            No other properties
+        
+    cards.get_default
+        Params:
+            None
+        Desc:
+            Returns the default card of the current user
+            Note:
+                If the current user does not have any added cards
+                the default card may be null
+        Output:
+            Example:
+            {
+                "success": true,
+                "api_time_taken": 1.158626,
+                "default_card": {
+                    "id": "card_16JffBCTG83q6EroAJkK6C8m",
+                    "object": "card",
+                    "address_city": null,
+                    "address_country": null,
+                    "address_line1": null,
+                    "address_line1_check": null,
+                    "address_line2": null,
+                    "address_state": null,
+                    "address_zip": null,
+                    "address_zip_check": null,
+                    "brand": "Visa",
+                    "country": "US",
+                    "customer": "cus_6Wj7zfDFJnWx0w",
+                    "cvc_check": "pass",
+                    "dynamic_last4": null,
+                    "exp_month": 5,
+                    "exp_year": 2016,
+                    "fingerprint": "GYBDZjR48DnJYcbX",
+                    "funding": "credit",
+                    "last4": "0077",
+                    "metadata": {},
+                    "name": null,
+                    "tokenization_method": null
+                }
+            }
+
+    cards.list
+        Params:
+            None
+        Desc:
+            Returns all cards of the current user
+            Note:
+                If the current user does not have any added cards
+                the list will be empty
+        Output:
+            Example:
+            {
+                "success": true,
+                "api_time_taken": 0.326636,
+                "card_list": [
+                    {
+                        "id": "card_16JffBCTG83q6EroAJkK6C8m",
+                        "object": "card",
+                        "address_city": null,
+                        "address_country": null,
+                        "address_line1": null,
+                        "address_line1_check": null,
+                        "address_line2": null,
+                        "address_state": null,
+                        "address_zip": null,
+                        "address_zip_check": null,
+                        "brand": "Visa",
+                        "country": "US",
+                        "customer": "cus_6Wj7zfDFJnWx0w",
+                        "cvc_check": "pass",
+                        "dynamic_last4": null,
+                        "exp_month": 5,
+                        "exp_year": 2016,
+                        "fingerprint": "GYBDZjR48DnJYcbX",
+                        "funding": "credit",
+                        "last4": "0077",
+                        "metadata": {},
+                        "name": null,
+                        "tokenization_method": null
+                    }
+                ]
+            }
+        
+USER
+====
+
+    user.info
+        Params:
+            None
+        Desc:
+            Returns a whole bunch info about the current user
+        Output:
+            Example:
+            
+            {
+                "success": true,
+                "api_time_taken": 0.697305,
+                "user_info": {
+                    "user_id": "89F5C71C033B4EB3A253C57A7B87270A",
+                    "user_regdate": "1435735500",
+                    "user_verified": "1",
+                    "firstname": "Matthew",
+                    "lastname": "Lee",
+                    "pass_chgdate": "0",
+                    "email": "matthewhlee96@gmail.com",
+                    "email_clean": "matthewhlee96@gmail.com",
+                    "email_hash": "fe611b569fd3fc789cd12e4a7923606f2f78e71d",
+                    "user_lang": "en",
+                    "user_timezone": "0.00",
+                    "user_dst": "0",
+                    "user_dateformat": "M j, Y",
+                    "user_timeformat": "g:i a"
+                },
+                "m_count": 6943,
+                "card_list": [
+                    {
+                        "id": "card_16JffBCTG83q6EroAJkK6C8m",
+                        "object": "card",
+                        "address_city": null,
+                        "address_country": null,
+                        "address_line1": null,
+                        "address_line1_check": null,
+                        "address_line2": null,
+                        "address_state": null,
+                        "address_zip": null,
+                        "address_zip_check": null,
+                        "brand": "Visa",
+                        "country": "US",
+                        "customer": "cus_6Wj7zfDFJnWx0w",
+                        "cvc_check": "pass",
+                        "dynamic_last4": null,
+                        "exp_month": 5,
+                        "exp_year": 2016,
+                        "fingerprint": "GYBDZjR48DnJYcbX",
+                        "funding": "credit",
+                        "last4": "0077",
+                        "metadata": {},
+                        "name": null,
+                        "tokenization_method": null
+                    }
+                ],
+                "cust_id": "cus_6Wj7zfDFJnWx0w"
+            }
+            
+    user.m_count
+        Params:
+            None
+        Desc:
+            Returns how much miles the user has available to use
+        Output:
+            Example:
+            
+            {
+                "success": true,
+                "api_time_taken": 0.00075700000000001,
+                "m_count": 6943
+            }
+            
+REQUEST
+=======
+
+    request.get_complete
+        Params:
+            limit - how many to get
+        Desc:
+            Get list of completed requests
+        Output:
+            Example:
+            
+            {
+                "success": true,
+                "api_time_taken": 0.000943,
+                "list": [
+                    {
+                        "r_id": "e63a710b2d7849e29ed123409a9bafe9",
+                        "user_id": "89f5c71c033b4eb3a253c57a7b87270a",
+                        "complete": "1",
+                        "s_time": "1445643296",
+                        "s_name": "Space Needle",
+                        "s_address": "Space Needle, 400 Broad St, Seattle, WA 98109, USA",
+                        "s_lat": "47.620506",
+                        "s_lng": "-122.349274",
+                        "e_time": "1445643511",
+                        "e_name": "White House Rose Garden",
+                        "e_address": "White House Rose Garden, 1600 Pennsylvania Ave NW, Washington, DC 20500, USA",
+                        "e_lat": "38.897526",
+                        "e_lng": "-77.037064",
+                        "m_dist_value": "4520389",
+                        "m_dist_text": "2,809 mi",
+                        "m_time_value": "148295",
+                        "m_time_text": "1 day 17 hours"
+                    }
+                ]
+            }
+            
+            NOTE:
+                m_dist_value is always in meters
+                m_time_value is always a unix timestamp
+            
+    request.get_active
+        Params:
+            limit - how many to get
+        Desc:
+            Get list of active requests
+        Output:
+            Example:
+            
+            {
+                "success": true,
+                "api_time_taken": 0.0012270000000001,
+                "list": [
+                    {
+                        "r_id": "803365ea3e4a49f0aef97c87d19be587",
+                        "user_id": "89f5c71c033b4eb3a253c57a7b87270a",
+                        "complete": "0",
+                        "s_time": "1445642401",
+                        "s_name": "Skyline High School",
+                        "s_address": "Skyline High School, 1122 228th Ave SE, Sammamish, WA 98075, USA",
+                        "s_lat": "47.600063",
+                        "s_lng": "-122.031540",
+                        "e_name": "Lincoln Square",
+                        "e_address": "Lincoln Square, Bellevue Way NE, Bellevue, WA 98004, USA",
+                        "e_lat": "47.616486",
+                        "e_lng": "-122.200890",
+                        "m_dist_value": "23750",
+                        "m_dist_text": "14.8 mi",
+                        "m_time_value": "1621",
+                        "m_time_text": "27 mins"
+                    },
+                    {
+                        "r_id": "bd939fc28a4b4b8fb0890f7e2df0c0d7",
+                        "user_id": "89f5c71c033b4eb3a253c57a7b87270a",
+                        "complete": "0",
+                        "s_time": "1445642481",
+                        "s_name": "Skyline High School",
+                        "s_address": "Skyline High School, 1122 228th Ave SE, Sammamish, WA 98075, USA",
+                        "s_lat": "47.600063",
+                        "s_lng": "-122.031540",
+                        "e_name": "Lincoln Square",
+                        "e_address": "Lincoln Square, Bellevue Way NE, Bellevue, WA 98004, USA",
+                        "e_lat": "47.616486",
+                        "e_lng": "-122.200890",
+                        "m_dist_value": "23750",
+                        "m_dist_text": "14.8 mi",
+                        "m_time_value": "1621",
+                        "m_time_text": "27 mins"
+                    }
+                ]
+            }
+            
+            NOTE:
+                m_dist_value is always in meters
+                m_time_value is always a unix timestamp
+                
+    request.start
+        Params:
+            charge  - A card_id or anything else
+                        If a card_id, it'll charge that card
+                        If anything else, miles will be deducted from user's current m_count
+            start   - start destination
+            end     - end destination
+            time    - taxi request start (pickup) time (set to empty string or "now" for current time)
+        Desc:
+            Start a new taxi request
+        Errors:
+            requestlayer.no-cust
+                The current user is not yet initialized as customer
+                (meaning that the user does not have any cards added)
+                
+            requestlayer.no-card
+                The given card_id is not associated with the current user
+                
+            requestlayer.m-insufficient
+                m_count balance is insufficient for this request
+                
+            requestlayer.no-such-place
+                Either the given start or end destination, or both, are places that do not exist
+                
+        Output
+        
+            Example for charging a card
+                
+                Params used
+                    start:   Skyline High School, 1122 228th Avenue Southeast, Sammamish, WA 98075
+                    end:     Lincoln Square, Bellevue Way NE, Bellevue, WA 98004
+                    charge:  card_16JffBCTG83q6EroAJkK6C8m
+                    time:
+                    
+                JSON Output:
+                {
+                    "success": true,
+                    "api_time_taken": 1.467373,
+                    "d_mi": 14.75756581,
+                    "r_id": "3B4D54D6D235496591E4CED7FF2002F0",
+                    "r_meta": {
+                        "dist_text": "14.8 mi",
+                        "dist_value": "23750",
+                        "time_text": "27 mins",
+                        "time_value": "1621"
+                    },
+                    "deduct": 2951,
+                    "ch_id": "ch_16zGlkCTG83q6EroTf1YwU6D"
+                }
+                
+                Note:
+                    "deduct" in this case (charge = card) is the amount
+                    of money charged to the card (always in cents)
+                    
+                    dist_value is always in meters
+                    
+                    d_mi is amount of miles
+            
+            Example for charging m_count
+            
+                Params used:
+                    start:   the space needle
+                    end:     the white house
+                    charge:  balance
+                    time:
+                
+                JSON Output:
+                
+                {
+                    "success": true,
+                    "api_time_taken": 0.725678,
+                    "d_mi": 2808.8395012337,
+                    "r_id": "5BCB40D5A9464A6F9945355F13BE85FE",
+                    "r_meta": {
+                        "dist_text": "2,809 mi",
+                        "dist_value": "4520389",
+                        "time_text": "1 day 17 hours",
+                        "time_value": "148295"
+                    },
+                    "deduct": 2808.8395012337
+                }
+                
+                Note:
+                    "deduct" in this case (charge = not a card) is the amount
+                    of miles deducted from the user's m_count
+                    
+                    dist_value is always in meters
+                    
+                    d_mi is amount of miles
+                    
+    request.end
+        Params:
+            r_id - ID of request to end
+        Desc:
+            End a taxi request at the current time
+        Errors:
+            requestlayer.no-request
+                No request by that ID
+            requestlayer.perm-denied
+                The request by that ID is not a request
+                started by the current user
+        Output:
+            No other properties
+            
+            Example:
+            {
+                "success":true,
+                "api_time_taken":0.030803
+            }
+            
+REQUEST AUTHENTICATION
+======================
+    You must still sign the request by including the "sig" param for all of these
+    
+    Note that you can set the value of "sig" to "override" to bypass signature verification.
+    However, due this at your own risk; bypassing signature verification does not ensure
+    that the parameters were not modified during the request to the server
+    
+    
+    For authenticated requests, you must include the "auth_token" parameter
+    
+    The "sig" and "auth_token" parameters do not count towards the "apicall.bad-request.param-count" error
+    
